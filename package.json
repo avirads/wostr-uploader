@@ -1,0 +1,11 @@
+{
+  "name": "wostr-upload",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Resumable 100GB-capable uploader with a Bun backend and WoSTR branding.",
+  "scripts": {
+    "start": "bun run server.js",
+    "dev": "bun --watch server.js"
+  }
+}

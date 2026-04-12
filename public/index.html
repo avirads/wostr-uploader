@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WoSTR Upload</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.165.0/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <canvas id="scene" aria-hidden="true"></canvas>
+
+      <div class="shell__content">
+        <header class="hero">
+          <img class="hero__logo" src="/assets/wostr-sec.jpg" alt="WoSTR Security" />
+          <p class="eyebrow">WoSTR Upload</p>
+          <h1>WoSTR Upload</h1>
+          <p class="hero__copy">
+            Choose a file or drop it here. Upload starts automatically and can continue from the last
+            confirmed point if the page is reopened with the same file.
+          </p>
+        </header>
+
+        <main class="layout">
+          <section class="panel panel--controls">
+            <input id="fileInput" type="file" hidden />
+            <button class="dropzone" id="dropzone" type="button">
+              <span class="dropzone__title">Choose a file or drop it here</span>
+              <span class="dropzone__copy" id="fileMeta">No file selected. Upload starts immediately after selection.</span>
+            </button>
+
+            <p class="status-line" id="statusLine">Select a file to begin upload.</p>
+
+            <div class="actions">
+              <button id="cancelButton" class="button button--danger hidden" type="button">Delete upload</button>
+            </div>
+          </section>
+
+          <section class="panel panel--metrics">
+            <div class="metric-grid">
+              <article class="metric-card">
+                <span>Progress</span>
+                <strong id="progressLabel">0%</strong>
+              </article>
+              <article class="metric-card">
+                <span>Speed</span>
+                <strong id="speedLabel">0 B/s</strong>
+              </article>
+              <article class="metric-card">
+                <span>ETA</span>
+                <strong id="etaLabel">--</strong>
+              </article>
+              <article class="metric-card">
+                <span>Status</span>
+                <strong id="stateLabel">Idle</strong>
+              </article>
+            </div>
+
+            <div class="progress-track" aria-hidden="true">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span>Uploaded</span>
+                <strong id="uploadedBytes">0 B</strong>
+              </div>
+              <div class="summary-item">
+                <span>Total size</span>
+                <strong id="totalBytes">0 B</strong>
+              </div>
+            </div>
+
+            <a id="downloadLink" class="download-link hidden" href="#">Download completed file</a>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
