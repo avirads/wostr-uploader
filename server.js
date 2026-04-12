@@ -1,9 +1,6 @@
-import { createWriteStream } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { Readable, Transform } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 
 const ROOT = import.meta.dir;
 const PUBLIC_ROOT = path.join(ROOT, 'public');
@@ -29,32 +26,6 @@ class HttpError extends Error {
     this.name = 'HttpError';
     this.statusCode = statusCode;
     this.details = details;
-  }
-}
-
-class VerifyingTransform extends Transform {
-  constructor(expectedBytes) {
-    super();
-    this.expectedBytes = expectedBytes;
-    this.bytesWritten = 0;
-    this.hash = crypto.createHash('sha256');
-  }
-
-  _transform(chunk, encoding, callback) {
-    const nextSize = this.bytesWritten + chunk.length;
-
-    if (nextSize > this.expectedBytes) {
-      callback(new HttpError(400, `Part exceeds expected size of ${this.expectedBytes} bytes.`));
-      return;
-    }
-
-    this.bytesWritten = nextSize;
-    this.hash.update(chunk);
-    callback(null, chunk);
-  }
-
-  digest() {
-    return this.hash.digest('hex');
   }
 }
 
@@ -344,25 +315,42 @@ async function streamPartToDisk(request, metadata, partNumber, checksum) {
 
   const offset = partNumber * metadata.chunkSize;
   const size = expectedPartSize(metadata, partNumber);
-  const verifier = new VerifyingTransform(size);
-  const writer = createWriteStream(tempPath(metadata.id), {
-    flags: 'r+',
-    start: offset
-  });
+  const buffer = Buffer.from(await request.arrayBuffer());
 
-  await pipeline(Readable.fromWeb(request.body), verifier, writer);
-
-  if (verifier.bytesWritten !== size) {
+  if (buffer.byteLength !== size) {
     throw new HttpError(
       400,
-      `Expected ${size} bytes for part ${partNumber}, received ${verifier.bytesWritten}.`
+      `Expected ${size} bytes for part ${partNumber}, received ${buffer.byteLength}.`
     );
   }
 
-  const actualChecksum = verifier.digest();
+  const actualChecksum = crypto.createHash('sha256').update(buffer).digest('hex');
 
   if (checksum && checksum !== actualChecksum) {
     throw new HttpError(400, `Checksum mismatch for part ${partNumber}.`);
+  }
+
+  const handle = await fs.open(tempPath(metadata.id), 'r+');
+
+  try {
+    let bytesWritten = 0;
+
+    while (bytesWritten < buffer.byteLength) {
+      const result = await handle.write(
+        buffer,
+        bytesWritten,
+        buffer.byteLength - bytesWritten,
+        offset + bytesWritten
+      );
+
+      if (result.bytesWritten <= 0) {
+        throw new HttpError(500, `Failed to persist part ${partNumber} to disk.`);
+      }
+
+      bytesWritten += result.bytesWritten;
+    }
+  } finally {
+    await handle.close();
   }
 
   return {
