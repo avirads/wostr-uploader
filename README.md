@@ -2,6 +2,8 @@
 
 Resumable large-file uploader with a Bun backend and a branded browser UI.
 
+![WoSTR Upload UI](./snapshot.JPG)
+
 ## What it does
 
 - Streams file parts directly to disk without buffering the whole file in memory.
