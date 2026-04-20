@@ -39,8 +39,35 @@ The app listens on [http://localhost:8080](http://localhost:8080).
 
 ## HTTP API
 
+- `PUT /api/lup` uploads a file in one request (curl-friendly raw body upload).
 - `POST /api/uploads` creates a session.
 - `GET /api/uploads/:id` reads status for resume.
 - `PUT /api/uploads/:id/parts/:partNumber` uploads one binary chunk.
 - `POST /api/uploads/:id/complete` finalizes the file once all parts are uploaded.
 - `DELETE /api/uploads/:id` deletes the upload session and removes any partial or finalized file.
+
+## Upload with curl
+
+Use raw body upload (`-T`) for a single-step upload:
+
+```powershell
+curl -T "D:\path\to\large-file.iso" "http://localhost:8081/api/lup?f=large-file.iso"
+```
+
+Or pass the filename in a header:
+
+```powershell
+curl -X PUT --data-binary "@D:\path\to\large-file.iso" -H "x-file-name: large-file.iso" http://localhost:8081/api/lup
+```
+
+Example response:
+
+```json
+{
+  "status": "complete",
+  "fileName": "large-file.iso",
+  "fileSize": 123456789,
+  "checksum": "<sha256>",
+  "downloadUrl": "/files/large-file.iso"
+}
+```

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="WoSTR Upload favicon">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#23c9b3"/>
+      <stop offset="100%" stop-color="#0a8f84"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="#041116"/>
+  <circle cx="32" cy="32" r="26" fill="url(#bg)" stroke="#0b252d" stroke-width="4"/>
+  <path
+    d="M14 32c4.8-7 10.8-10.5 18-10.5S45.2 25 50 32c-4.8 7-10.8 10.5-18 10.5S18.8 39 14 32Z"
+    fill="none"
+    stroke="#ffffff"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="4.5"
+  />
+  <circle cx="31" cy="32" r="7.5" fill="none" stroke="#ffffff" stroke-width="4.5" />
+  <path d="M36.5 37.5 46 47" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="5" />
+</svg>

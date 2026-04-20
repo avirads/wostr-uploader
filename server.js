@@ -145,6 +145,25 @@ function getHeader(request, name) {
   return request.headers.get(name);
 }
 
+function parseContentDispositionFileName(headerValue) {
+  if (!headerValue) {
+    return '';
+  }
+
+  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const plainMatch = headerValue.match(/filename="?([^";]+)"?/i);
+  return plainMatch?.[1] ?? '';
+}
+
 function getActiveSet(uploadId) {
   let set = activePartUploads.get(uploadId);
 
@@ -519,6 +538,105 @@ async function handleDeleteUpload(uploadId) {
   return empty();
 }
 
+async function handleCurlUpload(request, url) {
+  if (!request.body) {
+    throw new HttpError(400, 'Upload request must include a body.');
+  }
+
+  const contentLengthHeader = getHeader(request, 'content-length');
+
+  if (contentLengthHeader !== null) {
+    const declaredSize = parseNonNegativeInt(contentLengthHeader, 'content-length');
+
+    if (declaredSize <= 0) {
+      throw new HttpError(400, 'content-length must be greater than zero.');
+    }
+
+    if (declaredSize > MAX_FILE_SIZE) {
+      throw new HttpError(400, 'File exceeds the 100GB limit.');
+    }
+  }
+
+  const requestedName = getHeader(request, 'x-file-name')
+    ?? url.searchParams.get('f')
+    ?? parseContentDispositionFileName(getHeader(request, 'content-disposition'));
+  const safeName = sanitizeFileName(requestedName || 'upload.bin');
+  const tempName = `${crypto.randomUUID()}.curl.upload`;
+  const tempFile = path.join(UPLOAD_ROOT, tempName);
+  const reader = request.body.getReader();
+  const hash = crypto.createHash('sha256');
+  const handle = await fs.open(tempFile, 'w');
+
+  let bytesWrittenTotal = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      if (!value || value.byteLength === 0) {
+        continue;
+      }
+
+      bytesWrittenTotal += value.byteLength;
+
+      if (bytesWrittenTotal > MAX_FILE_SIZE) {
+        throw new HttpError(400, 'File exceeds the 100GB limit.');
+      }
+
+      hash.update(value);
+
+      const buffer = Buffer.from(value);
+      let bytesWrittenChunk = 0;
+
+      while (bytesWrittenChunk < buffer.byteLength) {
+        const result = await handle.write(
+          buffer,
+          bytesWrittenChunk,
+          buffer.byteLength - bytesWrittenChunk
+        );
+
+        if (result.bytesWritten <= 0) {
+          throw new HttpError(500, 'Failed to persist upload to disk.');
+        }
+
+        bytesWrittenChunk += result.bytesWritten;
+      }
+    }
+  } finally {
+    await handle.close();
+  }
+
+  if (bytesWrittenTotal <= 0) {
+    await fs.rm(tempFile, { force: true });
+    throw new HttpError(400, 'Uploaded file is empty.');
+  }
+
+  const finalName = await resolveUniqueFinalName(safeName);
+  const finalPath = path.join(FINAL_ROOT, finalName);
+
+  try {
+    await fs.rename(tempFile, finalPath);
+  } catch (error) {
+    await fs.rm(tempFile, { force: true });
+    throw error;
+  }
+
+  return json(
+    {
+      status: 'complete',
+      fileName: finalName,
+      fileSize: bytesWrittenTotal,
+      checksum: hash.digest('hex'),
+      downloadUrl: `/files/${encodeURIComponent(finalName)}`
+    },
+    201
+  );
+}
+
 async function serveStatic(pathname) {
   const relativePath = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1));
   const safePath = path.normalize(path.join(PUBLIC_ROOT, relativePath));
@@ -568,6 +686,10 @@ async function route(request) {
 
   if (request.method === 'POST' && pathname === '/api/uploads') {
     return handleCreateUpload(request);
+  }
+
+  if ((request.method === 'PUT' || request.method === 'POST') && pathname === '/api/lup') {
+    return handleCurlUpload(request, url);
   }
 
   const partMatch = pathname.match(/^\/api\/uploads\/([^/]+)\/parts\/(\d+)$/);
